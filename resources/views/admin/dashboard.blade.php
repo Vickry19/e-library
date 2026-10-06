@@ -53,10 +53,10 @@
                     </div>
                     <div class="stat-card-info">
                         <span class="stat-card-label">Total Buku</span>
-                        <span class="stat-card-value">{{ \App\Models\Buku::count() }}</span>
+                        <span class="stat-card-value">{{ $totalBuku ?? \App\Models\Buku::count() }}</span>
                         <span class="stat-card-desc">
                             <i class="fas fa-cubes"></i>
-                            {{ \App\Models\Buku::sum('stok') }} stok tersedia
+                            {{ $totalStok ?? \App\Models\Buku::sum('stok') }} stok tersedia
                         </span>
                     </div>
                 </div>
@@ -76,7 +76,7 @@
                     </div>
                     <div class="stat-card-info">
                         <span class="stat-card-label">Total Kategori</span>
-                        <span class="stat-card-value">{{ \App\Models\Kategori::count() }}</span>
+                        <span class="stat-card-value">{{ $totalKategori ?? \App\Models\Kategori::count() }}</span>
                         <span class="stat-card-desc">
                             <i class="fas fa-bookmark"></i>
                             Klasifikasi buku
@@ -99,10 +99,10 @@
                     </div>
                     <div class="stat-card-info">
                         <span class="stat-card-label">Total Member</span>
-                        <span class="stat-card-value">{{ \App\Models\User::where('role_id', 2)->count() }}</span>
+                        <span class="stat-card-value">{{ $totalMember ?? \App\Models\User::where('role_id', 2)->count() }}</span>
                         <span class="stat-card-desc">
                             <i class="fas fa-user-check"></i>
-                            {{ \App\Models\User::where('role_id', 2)->where('is_active', 1)->count() }} aktif
+                            {{ $totalMemberAktif ?? \App\Models\User::where('role_id', 2)->where('is_active', 1)->count() }} aktif
                         </span>
                     </div>
                 </div>
@@ -122,7 +122,7 @@
                     </div>
                     <div class="stat-card-info">
                         <span class="stat-card-label">Booking Aktif</span>
-                        <span class="stat-card-value">{{ \App\Models\Booking::count() }}</span>
+                        <span class="stat-card-value">{{ $bookingAktif ?? \App\Models\Booking::where('batas_ambil', '>', now())->count() }}</span>
                         <span class="stat-card-desc">
                             <i class="fas fa-clock"></i>
                             Menunggu diambil
@@ -138,13 +138,6 @@
 
     {{-- ==================== STATISTIK TRANSAKSI ==================== --}}
     <div class="row mb-3">
-        @php
-            $totalDipinjam = \App\Models\PinjamDetail::where('status', 'Pinjam')->count();
-            $totalDikembalikan = \App\Models\PinjamDetail::where('status', 'Kembali')->count();
-            $totalTransaksiHariIni = \App\Models\Pinjam::whereDate('tgl_pinjam', \Carbon\Carbon::today())->count();
-            $totalDenda = \App\Models\Pinjam::sum('total_denda');
-        @endphp
-
         <div class="col-lg-3 col-md-6 col-12">
             <div class="mini-stat-card mini-stat-warning">
                 <div class="mini-stat-icon">
@@ -152,7 +145,7 @@
                 </div>
                 <div class="mini-stat-content">
                     <span class="mini-stat-label">Sedang Dipinjam</span>
-                    <span class="mini-stat-value">{{ $totalDipinjam }}</span>
+                    <span class="mini-stat-value">{{ $totalDipinjam ?? \App\Models\PinjamDetail::where('status', 'Pinjam')->count() }}</span>
                 </div>
             </div>
         </div>
@@ -163,7 +156,7 @@
                 </div>
                 <div class="mini-stat-content">
                     <span class="mini-stat-label">Dikembalikan</span>
-                    <span class="mini-stat-value">{{ $totalDikembalikan }}</span>
+                    <span class="mini-stat-value">{{ $totalDikembalikan ?? \App\Models\PinjamDetail::where('status', 'Kembali')->count() }}</span>
                 </div>
             </div>
         </div>
@@ -174,7 +167,7 @@
                 </div>
                 <div class="mini-stat-content">
                     <span class="mini-stat-label">Transaksi Hari Ini</span>
-                    <span class="mini-stat-value">{{ $totalTransaksiHariIni }}</span>
+                    <span class="mini-stat-value">{{ $transaksiHariIni ?? \App\Models\Pinjam::whereDate('tgl_pinjam', today())->count() }}</span>
                 </div>
             </div>
         </div>
@@ -186,17 +179,16 @@
                 <div class="mini-stat-content">
                     <span class="mini-stat-label">Total Denda</span>
                     <span class="mini-stat-value" style="font-size: 1rem;">
-                        Rp {{ number_format($totalDenda, 0, ',', '.') }}
+                        Rp {{ number_format($totalDenda ?? \App\Models\Pinjam::sum('total_denda'), 0, ',', '.') }}
                     </span>
                 </div>
             </div>
         </div>
     </div>
 
-    {{-- ==================== CHART & AKTIVITAS ==================== --}}
+    {{-- ==================== CHART & TOP BUKU ==================== --}}
     <div class="row">
-
-        {{-- Chart Peminjaman --}}
+        {{-- Chart --}}
         <div class="col-lg-8 mb-3">
             <div class="card card-modern h-100">
                 <div class="card-header card-header-modern">
@@ -252,12 +244,10 @@
                 </div>
             </div>
         </div>
-
     </div>
 
     {{-- ==================== TABEL AKTIVITAS ==================== --}}
     <div class="row">
-
         {{-- Buku Terbaru --}}
         <div class="col-lg-6 mb-3">
             <div class="card card-modern h-100">
@@ -389,7 +379,6 @@
                 </div>
             </div>
         </div>
-
     </div>
 
     {{-- ==================== QUICK ACTIONS ==================== --}}
@@ -438,19 +427,16 @@
 @endsection
 
 @push('scripts')
-{{-- Chart.js --}}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <script>
     $(document).ready(function() {
-
         // ==================== CHART PEMINJAMAN ====================
         const ctx = document.getElementById('chartPeminjaman').getContext('2d');
 
-        // Generate gradient
         const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-        gradient.addColorStop(0, 'rgba(102, 126, 234, 0.5)');
-        gradient.addColorStop(1, 'rgba(102, 126, 234, 0.05)');
+        gradient.addColorStop(0, 'rgba(0, 123, 255, 0.5)');
+        gradient.addColorStop(1, 'rgba(0, 123, 255, 0.05)');
 
         @php
             $labels = [];
@@ -469,13 +455,13 @@
                 datasets: [{
                     label: 'Peminjaman',
                     data: {!! json_encode($dataPeminjaman) !!},
-                    borderColor: '#667eea',
+                    borderColor: '#007bff',
                     backgroundColor: gradient,
                     borderWidth: 3,
                     fill: true,
                     tension: 0.4,
                     pointBackgroundColor: '#fff',
-                    pointBorderColor: '#667eea',
+                    pointBorderColor: '#007bff',
                     pointBorderWidth: 3,
                     pointRadius: 6,
                     pointHoverRadius: 8,
@@ -485,9 +471,7 @@
                 responsive: true,
                 maintainAspectRatio: true,
                 plugins: {
-                    legend: {
-                        display: false
-                    },
+                    legend: { display: false },
                     tooltip: {
                         backgroundColor: '#212529',
                         padding: 12,
@@ -505,28 +489,16 @@
                 scales: {
                     y: {
                         beginAtZero: true,
-                        ticks: {
-                            stepSize: 1,
-                            precision: 0,
-                            color: '#6c757d'
-                        },
-                        grid: {
-                            color: '#f1f3f5',
-                            drawBorder: false
-                        }
+                        ticks: { stepSize: 1, precision: 0, color: '#6c757d' },
+                        grid: { color: '#f1f3f5', drawBorder: false }
                     },
                     x: {
-                        ticks: {
-                            color: '#6c757d'
-                        },
-                        grid: {
-                            display: false
-                        }
+                        ticks: { color: '#6c757d' },
+                        grid: { display: false }
                     }
                 }
             }
         });
-
     });
 </script>
 @endpush

@@ -30,27 +30,32 @@
         </div>
     </div>
 
-    {{-- ==================== STATISTIK MINI ==================== --}}
+    {{-- ==================== STATISTIK ==================== --}}
     @php
         $totalKembali = $data_pinjam->sum(fn($p) => $p->pinjam_detail->count());
-        $totalDenda = $data_pinjam->sum(function($p) {
-            $total = 0;
+
+        $totalTerlambat = 0;
+        $totalDenda = 0;
+
+        foreach ($data_pinjam as $p) {
             foreach ($p->pinjam_detail as $d) {
                 if (!is_null($d->tgl_pengembalian)) {
                     $tglKembali = \Carbon\Carbon::parse($d->tgl_kembali);
                     $tglPengembalian = \Carbon\Carbon::parse($d->tgl_pengembalian);
+
+                    // Cek apakah terlambat
                     if ($tglPengembalian->gt($tglKembali)) {
-                        $terlambat = $tglPengembalian->diffInDays($tglKembali);
-                        $total += $terlambat * $d->denda;
+                        $hariTerlambat = (int) $tglKembali->diffInDays($tglPengembalian);
+                        $totalTerlambat++;
+                        $totalDenda += $hariTerlambat * $d->denda;
                     }
                 }
             }
-            return $total;
-        });
+        }
     @endphp
 
     <div class="row mb-3">
-        <div class="col-lg-3 col-md-6 col-12">
+        <div class="col-lg-3 col-md-6 col-6 mb-2">
             <div class="mini-stat-card mini-stat-success">
                 <div class="mini-stat-icon">
                     <i class="fas fa-check-circle"></i>
@@ -61,7 +66,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-lg-3 col-md-6 col-12">
+        <div class="col-lg-3 col-md-6 col-6 mb-2">
             <div class="mini-stat-card mini-stat-primary">
                 <div class="mini-stat-icon">
                     <i class="fas fa-book"></i>
@@ -72,31 +77,44 @@
                 </div>
             </div>
         </div>
-        <div class="col-lg-3 col-md-6 col-12">
+        <div class="col-lg-3 col-md-6 col-6 mb-2">
             <div class="mini-stat-card mini-stat-danger">
+                <div class="mini-stat-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="mini-stat-content">
+                    <span class="mini-stat-label">Terlambat</span>
+                    <span class="mini-stat-value">{{ $totalTerlambat }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 col-6 mb-2">
+            <div class="mini-stat-card mini-stat-warning">
                 <div class="mini-stat-icon">
                     <i class="fas fa-money-bill-wave"></i>
                 </div>
                 <div class="mini-stat-content">
                     <span class="mini-stat-label">Total Denda</span>
-                    <span class="mini-stat-value" style="font-size: 1.1rem;">
+                    <span class="mini-stat-value" style="font-size: 1rem;">
                         Rp {{ number_format($totalDenda, 0, ',', '.') }}
                     </span>
                 </div>
             </div>
         </div>
-        <div class="col-lg-3 col-md-6 col-12">
-            <div class="mini-stat-card mini-stat-info">
-                <div class="mini-stat-icon">
-                    <i class="fas fa-users"></i>
-                </div>
-                <div class="mini-stat-content">
-                    <span class="mini-stat-label">Total Anggota</span>
-                    <span class="mini-stat-value">{{ $data_pinjam->pluck('id_user')->unique()->count() }}</span>
-                </div>
-            </div>
+    </div>
+
+    {{-- ==================== INFO BANNER ==================== --}}
+    @if($totalTerlambat > 0)
+    <div class="info-banner info-banner-warning">
+        <div class="info-banner-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <div class="info-banner-content">
+            <strong>Perhatian!</strong> Ada <strong>{{ $totalTerlambat }} buku</strong> yang dikembalikan terlambat
+            dengan total denda <strong>Rp {{ number_format($totalDenda, 0, ',', '.') }}</strong>.
         </div>
     </div>
+    @endif
 
     {{-- ==================== MAIN CARD ==================== --}}
     <div class="row">
@@ -131,8 +149,8 @@
                                 </label>
                                 <select id="filter-status" class="form-control form-control-modern">
                                     <option value="">Semua Status</option>
-                                    <option value="tepat">Tepat Waktu</option>
-                                    <option value="terlambat">Terlambat</option>
+                                    <option value="tepat">✅ Tepat Waktu</option>
+                                    <option value="terlambat">⚠️ Terlambat</option>
                                 </select>
                             </div>
                             <div class="col-lg-4">
@@ -158,7 +176,7 @@
                                     <th>Judul Buku</th>
                                     <th>Status</th>
                                     <th>Keterangan</th>
-                                    <th>Gambar</th>
+                                    <th width="10%">Gambar</th>
                                     <th>Petugas</th>
                                 </tr>
                             </thead>
@@ -169,17 +187,25 @@
                                     @php
                                         $terlambat = 0;
                                         $totalDenda = 0;
+                                        $isLate = false;
+
                                         if (!is_null($detail->tgl_pengembalian)) {
                                             $tglKembali = \Carbon\Carbon::parse($detail->tgl_kembali);
                                             $tglPengembalian = \Carbon\Carbon::parse($detail->tgl_pengembalian);
+
+                                            // ✅ KUNCI PERBAIKAN: cek dulu, baru hitung
                                             if ($tglPengembalian->gt($tglKembali)) {
-                                                $terlambat = $tglPengembalian->diffInDays($tglKembali);
+                                                // Terlambat: hitung dari tglKembali ke tglPengembalian (positif)
+                                                $terlambat = (int) $tglKembali->diffInDays($tglPengembalian);
                                                 $totalDenda = $terlambat * $detail->denda;
+                                                $isLate = true;
                                             }
                                         }
-                                        $statusFilter = $terlambat > 0 ? 'terlambat' : 'tepat';
+
+                                        $rowClass = $isLate ? 'tr-danger' : '';
+                                        $statusFilter = $isLate ? 'terlambat' : 'tepat';
                                     @endphp
-                                    <tr data-status="{{ $statusFilter }}">
+                                    <tr class="{{ $rowClass }}" data-status="{{ $statusFilter }}">
                                         <td>{{ $no++ }}</td>
                                         <td>
                                             <span class="badge badge-secondary badge-lg">
@@ -200,21 +226,27 @@
                                             </span>
                                         </td>
                                         <td>
-                                            <i class="fas fa-calendar-day text-success mr-1"></i>
-                                            {{ $detail->tgl_pengembalian ? \Carbon\Carbon::parse($detail->tgl_pengembalian)->format('d-m-Y') : '-' }}
-                                        </td>
-                                        <td>
-                                            <i class="fas fa-book text-muted mr-1"></i>
-                                            {{ $detail->buku->judul_buku ?? '-' }}
-                                        </td>
-                                        <td>
-                                            @if($detail->status == 'Kembali')
-                                                <span class="badge badge-success badge-lg">
-                                                    <i class="fas fa-check-circle"></i> Kembali
+                                            @if($detail->tgl_pengembalian)
+                                                <span class="{{ $isLate ? 'text-danger font-weight-bold' : 'text-success' }}">
+                                                    <i class="fas fa-calendar-day"></i>
+                                                    {{ \Carbon\Carbon::parse($detail->tgl_pengembalian)->format('d-m-Y') }}
                                                 </span>
                                             @else
-                                                <span class="badge badge-info badge-lg">
-                                                    <i class="fas fa-book-reader"></i> Dipinjam
+                                                <span class="text-muted">-</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <i class="fas fa-book text-primary mr-1"></i>
+                                            <strong>{{ $detail->buku->judul_buku ?? '-' }}</strong>
+                                        </td>
+                                        <td>
+                                            @if($isLate)
+                                                <span class="badge badge-danger badge-lg">
+                                                    <i class="fas fa-exclamation-triangle"></i> Terlambat
+                                                </span>
+                                            @else
+                                                <span class="badge badge-success badge-lg">
+                                                    <i class="fas fa-check-circle"></i> Tepat Waktu
                                                 </span>
                                             @endif
                                         </td>
@@ -224,11 +256,11 @@
                                                     <i class="fas fa-money-bill-wave text-success"></i>
                                                     Denda: <b>Rp {{ number_format($detail->denda, 0, ',', '.') }}</b>
                                                 </div>
-                                                <div class="{{ $terlambat > 0 ? 'text-danger' : 'text-success' }}">
+                                                <div class="{{ $isLate ? 'text-danger' : 'text-success' }}">
                                                     <i class="fas fa-clock"></i>
                                                     Terlambat: <b>{{ $terlambat }} hari</b>
                                                 </div>
-                                                @if($terlambat > 0)
+                                                @if($isLate)
                                                     <div class="text-danger font-weight-bold mt-1">
                                                         <i class="fas fa-exclamation-triangle"></i>
                                                         Total: Rp {{ number_format($totalDenda, 0, ',', '.') }}
@@ -304,19 +336,18 @@
         // Filter status
         $('#filter-status').on('change', function() {
             var val = $(this).val();
-            if (val === '') {
-                table.column(-1).search('').draw();
-                // Reset filter pakai custom filter
-                $.fn.dataTable.ext.search.pop();
-                table.draw();
-            } else {
-                $.fn.dataTable.ext.search.pop(); // hapus filter lama
+
+            // Hapus filter lama
+            $.fn.dataTable.ext.search.pop();
+
+            if (val !== '') {
                 $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
                     var row = table.row(dataIndex).node();
                     return $(row).data('status') === val;
                 });
-                table.draw();
             }
+
+            table.draw();
         });
 
         // Reset filter

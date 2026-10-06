@@ -12,9 +12,27 @@ use Illuminate\Support\Facades\Storage;
 class DashboardController extends Controller
 {
     public function index()
-    {
-        return view('admin.dashboard');
-    }
+{
+    // Statistik Utama
+    $totalBuku = \App\Models\Buku::count();
+    $totalStok = \App\Models\Buku::sum('stok');
+    $totalKategori = \App\Models\Kategori::count();
+    $totalMember = \App\Models\User::where('role_id', 2)->count();
+    $totalMemberAktif = \App\Models\User::where('role_id', 2)->where('is_active', 1)->count();
+    $bookingAktif = \App\Models\Booking::where('batas_ambil', '>', now())->count();
+
+    // Statistik Transaksi
+    $totalDipinjam = \App\Models\PinjamDetail::where('status', 'Pinjam')->count();
+    $totalDikembalikan = \App\Models\PinjamDetail::where('status', 'Kembali')->count();
+    $transaksiHariIni = \App\Models\Pinjam::whereDate('tgl_pinjam', today())->count();
+    $totalDenda = \App\Models\Pinjam::sum('total_denda');
+
+    return view('admin.dashboard', compact(
+        'totalBuku', 'totalStok', 'totalKategori',
+        'totalMember', 'totalMemberAktif', 'bookingAktif',
+        'totalDipinjam', 'totalDikembalikan', 'transaksiHariIni', 'totalDenda'
+    ));
+}
 
     public function tampilProfil()
     {

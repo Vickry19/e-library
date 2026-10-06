@@ -233,11 +233,11 @@
     </div>
 
     {{-- Pagination --}}
-    @if($buku->hasPages())
+@if($buku->hasPages())
     <div class="d-flex justify-content-center mt-4">
-        {{ $buku->appends(request()->query())->links() }}
+        {{ $buku->appends(request()->query())->links('vendor.pagination.simple-bootstrap-4') }}
     </div>
-    @endif
+@endif
 
 </main>
 

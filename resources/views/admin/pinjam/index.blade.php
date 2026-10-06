@@ -31,6 +31,14 @@
     </div>
 
     {{-- ==================== STATISTIK MINI ==================== --}}
+    @php
+        $totalDipinjam = \App\Models\PinjamDetail::where('status', 'Pinjam')->count();
+        $totalTerlambat = \App\Models\PinjamDetail::where('status', 'Pinjam')
+            ->where('tgl_kembali', '<', now())->count();
+        $totalAnggota = \App\Models\Pinjam::distinct('id_user')->count('id_user');
+        $transaksiHariIni = \App\Models\Pinjam::whereDate('tgl_pinjam', today())->count();
+    @endphp
+
     <div class="row mb-3">
         <div class="col-lg-3 col-md-6 col-12">
             <div class="mini-stat-card mini-stat-primary">
@@ -39,18 +47,18 @@
                 </div>
                 <div class="mini-stat-content">
                     <span class="mini-stat-label">Sedang Dipinjam</span>
-                    <span class="mini-stat-value" id="stat-aktif">-</span>
+                    <span class="mini-stat-value">{{ $totalDipinjam }}</span>
                 </div>
             </div>
         </div>
         <div class="col-lg-3 col-md-6 col-12">
-            <div class="mini-stat-card mini-stat-warning">
+            <div class="mini-stat-card mini-stat-danger">
                 <div class="mini-stat-icon">
                     <i class="fas fa-exclamation-triangle"></i>
                 </div>
                 <div class="mini-stat-content">
                     <span class="mini-stat-label">Terlambat</span>
-                    <span class="mini-stat-value" id="stat-terlambat">-</span>
+                    <span class="mini-stat-value">{{ $totalTerlambat }}</span>
                 </div>
             </div>
         </div>
@@ -61,18 +69,18 @@
                 </div>
                 <div class="mini-stat-content">
                     <span class="mini-stat-label">Total Anggota</span>
-                    <span class="mini-stat-value" id="stat-anggota">-</span>
+                    <span class="mini-stat-value">{{ $totalAnggota }}</span>
                 </div>
             </div>
         </div>
         <div class="col-lg-3 col-md-6 col-12">
             <div class="mini-stat-card mini-stat-info">
                 <div class="mini-stat-icon">
-                    <i class="fas fa-calendar-check"></i>
+                    <i class="fas fa-calendar-day"></i>
                 </div>
                 <div class="mini-stat-content">
                     <span class="mini-stat-label">Hari Ini</span>
-                    <span class="mini-stat-value" id="stat-hari-ini">-</span>
+                    <span class="mini-stat-value">{{ $transaksiHariIni }}</span>
                 </div>
             </div>
         </div>
@@ -83,7 +91,7 @@
         <div class="col-12">
             <div class="card card-modern">
 
-                {{-- Filter Header --}}
+                {{-- Header --}}
                 <div class="card-header card-header-modern">
                     <div class="d-flex align-items-center justify-content-between flex-wrap w-100">
                         <div class="d-flex align-items-center">
@@ -171,14 +179,6 @@
                 data: function(d) {
                     d.start_date = $('#start_date').val();
                     d.end_date = $('#end_date').val();
-                },
-                dataSrc: function(json) {
-                    // Update statistik
-                    $('#stat-aktif').text(json.recordsTotal || 0);
-                    $('#stat-terlambat').text(0);
-                    $('#stat-anggota').text(new Set(json.data.map(r => r.anggota)).size);
-                    $('#stat-hari-ini').text(json.data.length);
-                    return json.data;
                 }
             },
             columns: [

@@ -883,6 +883,27 @@
         font-size: 26px;
     }
 }
+
+/* Highlight baris terlambat */
+.tr-danger {
+    background-color: #fdecef !important;
+}
+
+.tr-danger:hover {
+    background-color: #fbdce0 !important;
+}
+
+.tr-danger td {
+    border-bottom-color: #f5c2c7 !important;
+}
+
+.tr-warning {
+    background-color: #fff8e1 !important;
+}
+
+.tr-warning:hover {
+    background-color: #ffecb3 !important;
+}
     </style>
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">

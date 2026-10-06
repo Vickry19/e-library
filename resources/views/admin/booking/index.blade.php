@@ -89,15 +89,32 @@
         <div class="col-12">
             <div class="card card-modern">
 
-                {{-- Header --}}
+                {{-- Header dengan Tombol Aksi --}}
                 <div class="card-header card-header-modern">
                     <div class="d-flex align-items-center justify-content-between flex-wrap w-100">
                         <div class="d-flex align-items-center">
                             <i class="fas fa-list-ul text-primary mr-2"></i>
                             <h5 class="mb-0 font-weight-bold">Daftar Booking Aktif</h5>
                         </div>
+                        <div class="mt-2 mt-md-0">
+                            <button type="button" class="btn btn-sm btn-warning" id="btn-cleanup" onclick="cleanupExpired()">
+                                <i class="fas fa-broom"></i> Bersihkan Expired
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger" id="btn-bulk-delete" onclick="bulkDelete()" disabled>
+                                <i class="fas fa-trash"></i> Hapus Terpilih
+                            </button>
+                        </div>
                     </div>
                 </div>
+
+                {{-- Form bulk delete & cleanup (hidden) --}}
+                <form id="form-bulk-delete" action="{{ route('admin.transaksi.booking.bulkDelete') }}" method="POST" class="d-none">
+                    @csrf
+                    <input type="hidden" name="ids" id="bulk-ids">
+                </form>
+                <form id="form-cleanup" action="{{ route('admin.transaksi.booking.cleanupExpired') }}" method="POST" class="d-none">
+                    @csrf
+                </form>
 
                 <div class="card-body">
 
@@ -113,6 +130,9 @@
                         <table id="booking-table" class="table table-modern">
                             <thead>
                                 <tr>
+                                    <th width="3%">
+                                        <input type="checkbox" id="check-all" onchange="toggleAll(this)">
+                                    </th>
                                     <th width="4%">#</th>
                                     <th>ID Booking</th>
                                     <th>Tgl. Booking</th>
@@ -127,24 +147,22 @@
                                 @php
                                     $batas = \Carbon\Carbon::parse($item->batas_ambil);
                                     $now = \Carbon\Carbon::now();
-
-                                    // Cek apakah sudah lewat batas
                                     $isExpired = $now->gt($batas);
 
                                     if ($isExpired) {
-                                        // Sudah lewat: hitung selisih dari batas ke now (positif)
                                         $selisihDetik = $batas->diffInSeconds($now);
                                     } else {
-                                        // Belum lewat: hitung selisih dari now ke batas (positif)
                                         $selisihDetik = $now->diffInSeconds($batas);
                                     }
 
-                                    // Konversi ke hari/jam/menit
-                                    $selisihHari  = (int) floor($selisihDetik / 86400);
-                                    $selisihJam   = (int) floor(($selisihDetik % 86400) / 3600);
+                                    $selisihHari = (int) floor($selisihDetik / 86400);
+                                    $selisihJam = (int) floor(($selisihDetik % 86400) / 3600);
                                     $selisihMenit = (int) floor(($selisihDetik % 3600) / 60);
                                 @endphp
                                 <tr class="{{ $isExpired ? 'tr-danger' : '' }}">
+                                    <td>
+                                        <input type="checkbox" class="booking-checkbox" value="{{ $item->id }}" onchange="updateBulkCount()">
+                                    </td>
                                     <td>{{ $loop->iteration }}</td>
                                     <td>
                                         <span class="badge badge-secondary badge-lg">
@@ -219,6 +237,13 @@
                                                 <i class="fas fa-eye"></i>
                                             </a>
                                             <button type="button"
+                                                    class="btn btn-sm btn-warning btn-modern-sm btn-cancel"
+                                                    data-toggle="tooltip" title="Batalkan"
+                                                    data-id="{{ $item->id }}"
+                                                    data-booking="{{ $item->id_booking }}">
+                                                <i class="fas fa-ban"></i>
+                                            </button>
+                                            <button type="button"
                                                     class="btn btn-sm btn-danger btn-modern-sm hapus-data"
                                                     data-toggle="tooltip" title="Hapus"
                                                     data-id="{{ $item->id }}"
@@ -230,12 +255,16 @@
                                                 @csrf
                                                 @method('DELETE')
                                             </form>
+                                            <form action="{{ route('admin.transaksi.booking.cancel', $item->id) }}"
+                                                  method="POST" id="form-cancel-{{ $item->id }}" class="d-none">
+                                                @csrf
+                                            </form>
                                         </div>
                                     </td>
                                 </tr>
                                 @empty
                                 <tr>
-                                    <td colspan="7">
+                                    <td colspan="8">
                                         <div class="text-center py-5">
                                             <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
                                             <h6 class="text-muted">Tidak ada booking saat ini</h6>
@@ -259,12 +288,14 @@
 @push('scripts')
 <script>
     $(document).ready(function() {
-
-        // Inisialisasi DataTable (jika ada data)
+        // Init DataTable
         if ($('#booking-table tbody tr').length > 0 && !$('#booking-table tbody tr td[colspan]').length) {
             $('#booking-table').DataTable({
                 responsive: true,
                 autoWidth: false,
+                columnDefs: [
+                    { orderable: false, targets: [0, 7] }
+                ],
                 language: {
                     search: "",
                     searchPlaceholder: "🔍 Cari data...",
@@ -272,32 +303,94 @@
                     info: "Menampilkan _START_ - _END_ dari _TOTAL_ data",
                     infoEmpty: "Tidak ada data",
                     zeroRecords: "Data tidak ditemukan",
-                    paginate: {
-                        first: "«",
-                        last: "»",
-                        next: "›",
-                        previous: "‹"
-                    }
+                    paginate: { first: "«", last: "»", next: "›", previous: "‹" }
                 }
             });
         }
 
         $('[data-toggle="tooltip"]').tooltip();
+        updateBulkCount();
+    });
 
-        // Hapus booking dengan SweetAlert
-        $(document).on('click', '.hapus-data', function() {
-            const id = $(this).data('id');
-            const idBooking = $(this).data('booking');
+    // ==================== CHECKBOX ====================
+    function toggleAll(source) {
+        document.querySelectorAll('.booking-checkbox').forEach(cb => {
+            cb.checked = source.checked;
+        });
+        updateBulkCount();
+    }
 
-            SwalConfirm(
-                'Hapus Booking?',
-                `Booking ${idBooking} akan dihapus permanen. Lanjutkan?`,
-                function() {
-                    $(`#form-hapus-${id}`).submit();
-                }
-            );
+    function updateBulkCount() {
+        const count = document.querySelectorAll('.booking-checkbox:checked').length;
+        const btn = document.getElementById('btn-bulk-delete');
+        if (count > 0) {
+            btn.innerHTML = `<i class="fas fa-trash"></i> Hapus (${count})`;
+            btn.disabled = false;
+        } else {
+            btn.innerHTML = `<i class="fas fa-trash"></i> Hapus Terpilih`;
+            btn.disabled = true;
+        }
+    }
+
+    // ==================== BULK DELETE ====================
+    function bulkDelete() {
+        const ids = [];
+        document.querySelectorAll('.booking-checkbox:checked').forEach(cb => {
+            ids.push(cb.value);
         });
 
+        if (ids.length === 0) {
+            SwalError('Pilih minimal 1 booking!');
+            return;
+        }
+
+        SwalConfirm(
+            'Hapus Booking Terpilih?',
+            `${ids.length} booking akan dihapus permanen.`,
+            function() {
+                document.getElementById('bulk-ids').value = JSON.stringify(ids);
+                document.getElementById('form-bulk-delete').submit();
+            }
+        );
+    }
+
+    // ==================== CLEANUP EXPIRED ====================
+    function cleanupExpired() {
+        SwalConfirm(
+            'Bersihkan Booking Expired?',
+            'Semua booking yang sudah lewat 1x24 jam akan dihapus dan stok buku dikembalikan.',
+            function() {
+                document.getElementById('form-cleanup').submit();
+            }
+        );
+    }
+
+    // ==================== CANCEL BOOKING ====================
+    $(document).on('click', '.btn-cancel', function() {
+        const id = $(this).data('id');
+        const idBooking = $(this).data('booking');
+
+        SwalConfirm(
+            'Batalkan Booking?',
+            `Booking ${idBooking} akan dibatalkan dan stok buku dikembalikan.`,
+            function() {
+                $(`#form-cancel-${id}`).submit();
+            }
+        );
+    });
+
+    // ==================== HAPUS BOOKING ====================
+    $(document).on('click', '.hapus-data', function() {
+        const id = $(this).data('id');
+        const idBooking = $(this).data('booking');
+
+        SwalConfirm(
+            'Hapus Booking?',
+            `Booking ${idBooking} akan dihapus permanen.`,
+            function() {
+                $(`#form-hapus-${id}`).submit();
+            }
+        );
     });
 </script>
 @endpush

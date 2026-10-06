@@ -66,6 +66,10 @@ Route::middleware(['auth', 'isAdmin'])->group(function () {
 
         // Kembalikan Buku
         Route::put('pinjam/kembalikanBuku/{no_pinjam}/{id_buku}', [PinjamController::class, 'kembalikanBuku'])->name('pinjam.kembalikanBuku');
+
+        Route::post('booking/{id}/cancel', [AdminBookingController::class, 'cancel'])->name('booking.cancel');
+    Route::post('booking/bulk-delete', [AdminBookingController::class, 'bulkDelete'])->name('booking.bulkDelete');
+    Route::post('booking/cleanup-expired', [AdminBookingController::class, 'cleanupExpired'])->name('booking.cleanupExpired');
     });
 });
 
